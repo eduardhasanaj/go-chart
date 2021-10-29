@@ -38,6 +38,8 @@ type BarChart struct {
 
 	Bars     []Value
 	Elements []Renderable
+
+	extraWidth int
 }
 
 // GetDPI returns the dpi for the chart.
@@ -61,7 +63,7 @@ func (bc BarChart) GetWidth() int {
 	if bc.Width == 0 {
 		return DefaultChartWidth
 	} else if bc.Width == -1 {
-		return bc.autoWidth()
+		return bc.autoWidth() + bc.extraWidth
 	}
 	return bc.Width
 }
@@ -109,7 +111,8 @@ func (bc BarChart) Render(rp RendererProvider, w io.Writer) error {
 		return errors.New("please provide at least one bar")
 	}
 
-	r, err := rp(bc.GetWidth(), bc.GetHeight())
+	width := bc.GetWidth()
+	r, err := rp(width, bc.GetHeight())
 	if err != nil {
 		return err
 	}
@@ -122,6 +125,15 @@ func (bc BarChart) Render(rp RendererProvider, w io.Writer) error {
 		bc.defaultFont = defaultFont
 	}
 	r.SetDPI(bc.GetDPI())
+
+	titleBox := bc.measureTitleBox(r)
+	if width < titleBox.Width()+4*DefaultYAxisMargin {
+		bc.extraWidth = titleBox.Width() + 4*DefaultYAxisMargin - bc.GetWidth()
+		r, err = rp(width+bc.extraWidth, bc.GetHeight())
+		if err != nil {
+			return nil
+		}
+	}
 
 	bc.drawBackground(r)
 
@@ -294,6 +306,15 @@ func (bc BarChart) drawTitle(r Renderer) {
 
 		r.Text(bc.Title, titleX, titleY)
 	}
+}
+
+func (bc BarChart) measureTitleBox(r Renderer) Box {
+	r.SetFont(bc.TitleStyle.GetFont(bc.GetFont()))
+	r.SetFontColor(bc.TitleStyle.GetFontColor(bc.GetColorPalette().TextColor()))
+	titleFontSize := bc.TitleStyle.GetFontSize(bc.getTitleFontSize())
+	r.SetFontSize(titleFontSize)
+
+	return r.MeasureText(bc.Title)
 }
 
 func (bc BarChart) getCanvasStyle() Style {
